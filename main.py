@@ -5,7 +5,7 @@ from myfun import vec_r_n, vec_v_TCP_x, vec_F_N_x
 from myfun import ddot_phi, ddot_psi, ddot_theta, ddot_z
 from myfun import RK1, RK2, RK4, VL
 
-
+#comment from geoff
 R = 0.0025
 m = 0.015
 a = 0.0005
