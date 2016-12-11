@@ -1,6 +1,15 @@
 import numpy as np
 #nn np n3
 
+
+g = 9.82
+mu = 0.3
+m = 0.02
+R = 0.02
+alpha = 0.3
+I1 = 131/350*m*R**2
+I3 = 0.4*m*R**2   
+
 def n_into_x(phi,psi,theta,A):
     x = A[0]*np.cos(phi) - A[1]*np.cos(theta)*np.sin(phi) + A[2]*np.sin(theta)*np.sin(phi)
     y = A[0]*np.sin(phi) + A[1]*np.cos(theta)*np.cos(phi) - A[2]*np.sin(theta)*np.cos(phi)
