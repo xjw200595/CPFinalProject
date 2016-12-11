@@ -1,26 +1,6 @@
 import numpy as np
 #nn np n3
 
-
-'''
-R = 0.0025
-m = 0.02
-DensityRatio = 2.0
-a = 3.0/8.0*R*(DensityRatio-1.0)/(DensityRatio+1.0)
-I = 2.0*m*R*R/5.0
-I3 = 0.8*I
-mu = 0.3
-g = 9.8
-'''
-
-R = 0.0025
-m = 0.015
-a = 0.0005
-I = 0.4*m*R*R
-I3 = 0.8*I
-mu = 0.3
-g = 9.8
-
 def n_into_x(phi,psi,theta,A):
     x = A[0]*np.cos(phi) - A[1]*np.cos(theta)*np.sin(phi) + A[2]*np.sin(theta)*np.sin(phi)
     y = A[0]*np.sin(phi) + A[1]*np.cos(theta)*np.cos(phi) - A[2]*np.sin(theta)*np.cos(phi)
@@ -39,58 +19,6 @@ def mod(A):
     z2 = A[2]**2
     S = np.sqrt(x2+y2+z2)
     return S
-
-'''
-def vec_omega_n(phi,dot_phi,psi,dot_psi,theta,dot_theta):
-    omega_nn = dot_theta
-    omega_np = dot_phi*np.sin(theta)
-    omega_nt = dot_psi+dot_phi*np.cos(theta)
-    return np.array([omega_nn, omega_np, omega_nt])
-    
-def vec_alpha_n(phi,dot_phi,psi,dot_psi,theta,dot_theta):
-    alpha_nn = dot_theta
-    alpha_np = dot_phi*np.sin(theta)
-    alpha_nt = dot_phi*np.cos(theta)
-    return np.array([alpha_nn, alpha_np, alpha_nt])
-'''
-def vec_r_n(phi,dot_phi,psi,dot_psi,theta,dot_theta):
-    r_nn = 0
-    r_np = -R*np.sin(theta)
-    r_nt = a-R*np.cos(theta)
-    return np.array([r_nn, r_np, r_nt])
-'''    
-def vec_v_TC_n(phi,dot_phi,psi,dot_psi,theta,dot_theta):
-    v_TC_nn = (R*dot_psi+a*dot_phi)*np.sin(theta)
-    v_TC_np = dot_theta*(R*np.cos(theta)-a)
-    v_TC_nt = -dot_theta*R*np.sin(theta)
-    return np.array([v_TC_nn, v_TC_np, v_TC_nt])
-'''
-#x,y,z
-def vec_v_TCP_x(phi,dot_phi,psi,dot_psi,theta,dot_theta):
-    v_TCP_nx = (R*dot_psi+a*dot_phi)*np.sin(theta)*np.cos(phi)+dot_theta*np.sin(phi)*(a*np.cos(theta)-R)
-    v_TCP_ny = (R*dot_psi+a*dot_phi)*np.sin(theta)*np.sin(phi)+dot_theta*np.cos(phi)*(R-a*np.cos(theta))
-    v_TCP_nz = 0
-    return np.array([v_TCP_nx, v_TCP_ny, v_TCP_nz])
-    
-def vec_F_N_x(ddz):
-    F_N_z = m*g+m*ddz
-    return np.array([0,0,F_N_z])
-    
-
-def ddot_phi(phi,dot_phi,psi,dot_psi,theta,dot_theta,N):
-    return (N[1]-(2*I-I3)*dot_theta*dot_phi*np.cos(theta)+I3*dot_theta*dot_psi)/(I*np.sin(theta))
-    
-def ddot_psi(phi,dot_phi,psi,dot_psi,theta,dot_theta,N):
-    return N[2]/I3-ddot_phi(phi,dot_phi,psi,dot_psi,theta,dot_theta,N)*np.cos(theta)+dot_phi*dot_theta*np.sin(theta)
-    
-def ddot_theta(phi,dot_phi,psi,dot_psi,theta,dot_theta,N):
-    return (N[0]-I3*dot_phi*dot_psi*np.sin(theta)-(I3-I)*dot_phi**2*np.sin(theta)*np.cos(theta))
-    
-def ddot_z(phi,dot_phi,psi,dot_psi,theta,dot_theta):
-    return a*(dot_theta**2*np.cos(theta)+0)
-    
-    
-    
     
 ###############################################################################
 #RK4
@@ -106,52 +34,93 @@ def RK4(f, t0, t1, x0, N):
         k4 = h*f(x[i]+k3, t[i]+h)
         x[i+1] = x[i] + (k1+2*k2+2*k3+k4)/float(6)
     return t, x
-    
-    
+
+
 ###############################################################################
-#RK2
-def RK2(f, t0, t1, x0, N):
-    h = (t1-t0)/float(N)
-    t = t0 + np.arange(N+1)*h
-    x = np.zeros([N+1,len(x0)])
-    x[0] = x0
-    for i in range(N):
-        k1 = h*f(x[i],t[i])
-        k2 = h*f(x[i]+0.5*k1, t[i]+0.5*h)
-        x[i+1] = x[i] + k2
-    return t, x
-    
+#One step of RK4
+def RK4_1step(f,x,t,h):
+    k1 = h*f(x,t)
+    k2 = h*f(x+0.5*k1, t+0.5+h)
+    k3 = h*f(x+0.5*k2, t+0.5*h)
+    k4 = h*f(x+k3,t+h)
+    x = x+(k1+2*k2+2*k3+k4)/float(6)
+    t = t + h
+    return t, x 
+
 ###############################################################################
-#Euler Forward
-def RK1(f, t0, t1, x0, N):
-    h = (t1-t0)/float(N)
-    t = t0 + np.arange(N+1)*h
-    x = np.zeros([N+1,len(x0)])
-    x[0] = x0
-    for i in range(N):
-        k1 = h*f(x[i],t[i])
-        x[i+1] = x[i] + k1
-    return t, x
+#RK4 with adaptive
+def RK4_AD(f, t0, t_end, x0, sigma, h):    
+    T = []
+    T.append(t0)   
+    XX = []
+    XX.append(x0)
+    t = t0    
+    while t < t_end-t0:
+        rho = 0
+        while rho < 1 or rho == 1:    
+            x1 = XX[-1]
+            x2 = XX[-1]           
+            t1 = T[-1]
+            t2 = T[-1]
+            h1 = h
+            h2 = h*2
+            tmid, xmid = RK4_1step(f,x1,t1,h1)
+            t1, x1 = RK4_1step(f,xmid,tmid,h1)
+            t2, x2 = RK4_1step(f,x2,t2,h2)
+            
+            rho = h*sigma*30/np.sqrt(((x1-x2)**2).sum())   
+            if rho<1:
+                h = h*rho**0.25
+        t = t + h2  
+        print(t)
+        T.append(t)
+        XX.append(x1)            
+        h = min([h*rho**0.25,2*h,(t_end-t)/2])    
+    return T, np.array(XX)
     
+def ddtheta(theta, dot_theta, dot_phi, omega, vx, vy, gn):
+    solution = np.sin(theta)/I1*(I1*dot_phi**2*np.cos(theta) - I3*omega*dot_phi - R*alpha*gn) + R*mu*gn*vx/I1*(1-alpha*np.cos(theta))
+    return solution
+
+def ddphi(theta, dot_theta, dot_phi, omega, vx, vy, gn):
+    solution = (I3*dot_theta*omega - 2*I1*dot_theta*dot_phi*np.cos(theta) - mu*gn*vy*R*(alpha-np.cos(theta)))/(I1*np.sin(theta))
+    return solution
+        
+def domega(theta, dot_theta, dot_phi, omega, vx, vy, gn):
+    solution = -mu*gn*vy*R*np.sin(theta)/I3
+    return solution
     
-###############################################################################
-#Verlet    
-def VL(f, t0, t1, x0, N):
-    h = (t1-t0)/float(N)
-    t = t0 + np.arange(N+1)*h
-    x = np.zeros([N+1,len(x0)/2])
-    v = np.zeros([N+1,len(x0)/2])
-    x[0] = [x0[0],x0[2],x0[4],x0[6],x0[8]]
-    v[0] = [x0[1],x0[3],x0[5],x0[7],x0[9]]
-    v_temp = v[0] + 0.5*h*f(x[0],t[0])
-    for i in range(N):
-        x[i+1] = x[i] + h*v_temp
-        k = h*f(x[i+1],t+h)
-        v[i+1] = v_temp + 0.5*k
-        v_temp = v_temp + k
-    XX = np.zeros([N+1,len(x0)])
-    XX[:,0] = x[:,0]
-    XX[:,2] = x[:,1]
-    XX[:,1] = v[:,0]
-    XX[:,3] = v[:,1]
-    return t, XX
+def dvx(theta, dot_theta, dot_phi, omega, vx, vy, gn):
+    part1 = R*np.sin(theta)/I1*(dot_phi*omega*(I3*(1-alpha*np.cos(theta))-I1) + gn*R*alpha*(1-alpha*np.cos(theta)) - I1*alpha*(dot_theta**2+dot_phi**2*np.sin(theta)**2))
+    part2 = -mu*gn*vx/m/I1*(I1 + m*R**2*(1-alpha*np.cos(theta))**2) + dot_phi*vy
+    solution = part1 + part2
+    return solution
+    
+def dvy(theta, dot_theta, dot_phi, omega, vx, vy, gn):
+    part1 = -mu*gn*vy/(m*I1*I3)*(I1*I3 + m*R**2*I3*(alpha-np.cos(theta))**2 + m*R**2*I1*np.sin(theta)**2)
+    part2 = omega*dot_theta*R/I1*(I3*(alpha-np.cos(theta)) + I1*np.cos(theta)) - dot_phi*vx
+    solution = part1 + part2
+    return solution
+
+def f_gn(theta, dot_theta, dot_phi, omega, vx, vy):
+    upper = m*g*I1 + m*R*alpha*(np.cos(theta)*(I1*dot_phi**2*np.sin(theta)**2 + I1*dot_theta**2) - I3*dot_phi*omega*np.sin(theta)**2)
+    bottom = I1 + m*R**2*alpha**2*np.sin(theta)**2 - m*R**2*alpha*np.sin(theta)*(1-alpha*np.cos(theta))*mu*vx
+    solution = float(upper)/bottom
+    return solution
+
+def Energy(theta, dot_theta, dot_phi, omega):
+    part1 = 0.5*(I1*dot_phi**2*np.sin(theta)**2 + I1*dot_theta**2 + I3*omega**2)
+    part2 = m*g*R*(1-np.cos(theta))
+    part3 = 0.5*m*R**2*((alpha-np.cos(theta))**2*(dot_theta**2+dot_phi**2*np.sin(theta)**2) + np.sin(theta)**2*(dot_theta**2 + omega**2 + 2*omega*dot_phi*(alpha-np.cos(theta))))
+    solution = part1 + part2 + part3
+    return solution
+
+def ODE(x ,t):
+    gn = f_gn(x[0], x[1], x[2], x[3], x[4], x[5])
+    dx0 = x[1]
+    dx1 = ddtheta(x[0], x[1], x[2], x[3], x[4], x[5], gn)
+    dx2 = ddphi(x[0], x[1], x[2], x[3], x[4], x[5], gn)
+    dx3 = domega(x[0], x[1], x[2], x[3], x[4], x[5], gn)
+    dx4 = dvx(x[0], x[1], x[2], x[3], x[4], x[5], gn)
+    dx5 = dvy(x[0], x[1], x[2], x[3], x[4], x[5], gn)
+    return np.array([dx0, dx1, dx2, dx3, dx4, dx5])
